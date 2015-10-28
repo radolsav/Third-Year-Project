@@ -34,7 +34,6 @@ public class ViradoGUI extends Application {
     scan_tab.setText("Scan");
     scanButton = new Button("Scan");
     final DropShadow shadow = new DropShadow();
-    D
     scanButton.setOnAction(new EventHandler<ActionEvent>() {
       @Override
       public void handle(ActionEvent e) {
