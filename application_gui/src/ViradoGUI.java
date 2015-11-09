@@ -54,6 +54,16 @@ public class ViradoGUI extends Application {
 
       }
     });
+    customScanButton.setOnAction(new EventHandler<ActionEvent>() {
+      @Override
+      public void handle(ActionEvent actionEvent) {
+        try {
+          SignatureCompare.compareSignatures();
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+      }
+    });
     VBox vbox = new VBox();
     VBox.setMargin(quickScanButton, new Insets(23, 100, 0, 100));
     VBox.setMargin(fullScanButton, new Insets(0, 100, 0, 100));

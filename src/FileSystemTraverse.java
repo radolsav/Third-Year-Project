@@ -1,11 +1,15 @@
 import eu.medsea.mimeutil.MimeUtil;
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
+
+import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
+import java.io.*;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Collection;
+import java.util.Enumeration;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 
 public class FileSystemTraverse extends SimpleFileVisitor<Path> {
@@ -17,6 +21,14 @@ public class FileSystemTraverse extends SimpleFileVisitor<Path> {
       Collection<?> mimeTypes = MimeUtil.getMimeTypes(newFile);
       System.out.println("Regular file : " + file);
       System.out.println("Type of file : " + mimeTypes);
+      if (mimeTypes.toString().equals("application/zip") && file.toString().equals("D:\\test2.zip")) {
+        unzipFile(file);
+      }
+      if(file.toString().equals("D:\\install\\putty.exe"))
+      {
+        FileInputStream inputStream = new FileInputStream(file.toString());
+        System.out.println(readInputAndGenerateMd5(inputStream));
+      }
     } else if (attributes.isSymbolicLink()) {
       System.out.println("Symbolic link : " + file);
     } else {
@@ -24,6 +36,45 @@ public class FileSystemTraverse extends SimpleFileVisitor<Path> {
     }
     return FileVisitResult.CONTINUE;
   }
+
+  private void unzipFile(Path path) throws IOException {
+    ZipFile zipFile = new ZipFile(path.toString());
+    Enumeration<? extends ZipEntry> entries = zipFile.entries();
+    while (entries.hasMoreElements()) {
+      ZipEntry entry = entries.nextElement();
+      System.out.println(entry.getName());
+      InputStream fileInputStream = zipFile.getInputStream(entry);
+      System.out.println(readInputAndGenerateMd5(fileInputStream));
+      System.out.println(entry.getSize());
+    }
+  }
+
+  private String readInputAndGenerateMd5(InputStream fileInputStream) throws UnsupportedEncodingException {
+    String md5hash = "";
+    try {
+      MessageDigest messageDigest = MessageDigest.getInstance("MD5");
+      md5hash = getMd5(fileInputStream, messageDigest, 2048);
+      messageDigest.reset();
+    } catch (NoSuchAlgorithmException | IOException e) {
+      e.printStackTrace();
+    }
+    return md5hash;
+  }
+
+  public static String getMd5(InputStream inputStream, MessageDigest messageDigest, int sizeOfArray)
+          throws NoSuchAlgorithmException, IOException {
+
+    messageDigest.reset();
+    byte[] bytes = new byte[sizeOfArray];
+    int numBytes;
+    while ((numBytes = inputStream.read(bytes)) != -1) {
+      messageDigest.update(bytes, 0, numBytes);
+    }
+    byte[] digest = messageDigest.digest();
+    String result = new HexBinaryAdapter().marshal((digest));
+    return result;
+  }
+
 
   @Override
   public FileVisitResult postVisitDirectory(Path dir,
@@ -38,39 +89,6 @@ public class FileSystemTraverse extends SimpleFileVisitor<Path> {
     System.err.println(exc);
     return FileVisitResult.CONTINUE;
   }
-
-  /*public static void traverse()
-  {
-    File[] paths;
-    FileSystemView fileSystemView = FileSystemView.getFileSystemView();
-
-    paths = File.listRoots();
-    for(File path : paths)
-    {
-      System.out.println("Drive name: " + path);
-      if (path.toString().equals("D:\\")) {
-        if (fileSystemView.getSystemTypeDescription(path).equals("Local Disk")) {
-          search(path);
-        }
-      }
-      System.out.println("Desc: " + fileSystemView.getSystemTypeDescription(path));
-    }*/
-
-
-  /*// Recursion through the disk
-  private static void search(File path) {
-    File[] paths = path.listFiles();
-    if (paths != null) {
-      for (File newPath : paths) {
-        if (newPath.isDirectory()) {
-          System.out.println("Dir" + newPath.getName());
-          search(newPath);
-        } else {
-          System.out.println("File" + newPath.getName());
-        }
-      }
-    }
-  }*/
 
 }
 
