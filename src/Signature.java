@@ -1,14 +1,13 @@
 /**
- * Created by User on 04/11/2015.
+ * Created by User on 12/11/2015.
  */
 public class Signature {
-  private String signatureHash;
-  private int size;
+  private String signature;
   private String malwareName;
 
-  public Signature(String signatureHash, int size, String malwareName) {
-    this.signatureHash = signatureHash;
-    this.size = size;
+
+  public Signature(String signatureHash, String malwareName) {
+    this.signature = signatureHash;
     this.malwareName = malwareName;
   }
 
@@ -16,13 +15,10 @@ public class Signature {
 
   }
 
-  public String getSignatureHash() {
-    return signatureHash;
+  public String getSignature() {
+    return signature;
   }
 
-  public int getSize() {
-    return size;
-  }
 
   public String getMalwareName() {
     return malwareName;
@@ -32,11 +28,7 @@ public class Signature {
     this.malwareName = malwareName;
   }
 
-  public void setSignatureHash(String signatureHash) {
-    this.signatureHash = signatureHash;
-  }
-
-  public void setSize(int size) {
-    this.size = size;
+  public void setSignatureHash(String signature) {
+    this.signature = signature;
   }
 }

@@ -2,35 +2,51 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.orchestrate.client.*;
 
 import java.io.IOException;
-import java.util.ArrayList;
 
 public class SignatureCompare {
+
+  private static final Client client = new OrchestrateClient("e4f5cbf3-991a-41ab-aa6e-346d53c0ac2b");
+
   @JsonIgnoreProperties
-  public static void compareSignatures() throws IOException {
-    Client client = new OrchestrateClient("e4f5cbf3-991a-41ab-aa6e-346d53c0ac2b");
-    Signature signature = new Signature("49D165883CCACF53621145BAADFEC095",58,"Test.java.txt");
+  public static void compareSignatures(String md5hash) throws IOException {
+//    HashSignature signature = new HashSignature("44D88612FEA8A8F36DE82E1278ABB02F",68,"eicar.com");
 
-    ArrayList<Signature> signatureList = new ArrayList<>(100);
-    for(Signature signature1 : signatureList)
-    {
-      signature1.setSignatureHash();
-      signature1.setSize();
-      signature1.setMalwareName();
-    }
-    KvMetadata signatureMeta = client.postValue("Signatures", signature).get();
+//    KvMetadata signatureMeta = client.postValue("HashSignatures", signature).get();
+    /*KvObject<HashSignature> signatureKvObject =
+            client.kv("HashSignatures", "0db20ca56640ae01")
+                    .get(HashSignature.class)
+                    .get();*/
 
-/*    KvObject<Signature> signatureKvObject =
-            client.kv("Signatures", "0d94530b7140bccc")
-                    .get(Signature.class)
+    String luceneQuery = "value.signature: " + md5hash;
+    SearchResults<HashSignature> results =
+            client.searchCollection("HashSignatures")
+                    .limit(20)
+                    .get(HashSignature.class, luceneQuery)
                     .get();
 
-    if (signatureKvObject == null) {
+    for (Result<HashSignature> signature : results) {
+      KvObject<HashSignature> kvObject = signature.getKvObject();
+      if (kvObject == null) {
+        System.out.println("No threat found!");
+      } else {
+        HashSignature hashSignature = kvObject.getValue();
+        System.out.println("Threat found!");
+        ViradoGUI viradoGUI = new ViradoGUI();
+        viradoGUI.setInfectedFiles();
+        System.out.println("Malware name: " + hashSignature.getMalwareName());
+        System.out.println("Malware size: " + hashSignature.getSize());
+        System.out.println("Malware signature: " + hashSignature.getSignature());
+      }
+    }
+
+    /*if (signatureKvObject == null) {
       System.out.println("User 'test@email.com' does not exist.");
     } else {
-      Signature sgn = signatureKvObject.getValue();
-      System.out.println(sgn.getSignatureHash());
-      System.out.println("Hash " + sgn.getSignatureHash() + " Size " + sgn.getSize() + "Name: " + sgn.getMalwareName());
+      HashSignature sgn = signatureKvObject.getValue();
+      System.out.println(sgn.getSignature());
+      System.out.println("Hash " + sgn.getSignature() + " Size " + sgn.getSize() + "Name: " + sgn.getMalwareName());
       System.out.println(signatureKvObject.getRawValue());
     }*/
   }
+
 }
