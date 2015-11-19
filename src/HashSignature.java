@@ -2,9 +2,9 @@
  * Created by User on 04/11/2015.
  */
 public class HashSignature extends Signature{
-  private int size;
+  private long size;
 
-  public HashSignature(String signatureHash,int size, String malwareName) {
+  public HashSignature(String signatureHash,long size, String malwareName) {
     super(signatureHash,malwareName);
     this.size = size;
   }
@@ -13,7 +13,7 @@ public class HashSignature extends Signature{
 
   }
 
-  public int getSize() {
+  public long getSize() {
     return size;
   }
 
