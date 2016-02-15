@@ -21,17 +21,32 @@ import java.util.zip.ZipFile;
  */
 public class FileSystemTraverse extends Task<ObservableList<Malware>> implements FileVisitor<Path> {
 
+    private static final String ZIP_MIME = "application/zip";
+    private static final String DIGEST_ALGORITHM = "SHA-256";
     private Client client;
     private int infectedFiles;
-    private ArrayList<String> files;
-    private int FIRST_LAYER_OF_DIRS_SIZE;
+//    private ArrayList<String> files;
+//    private int FIRST_LAYER_OF_DIRS_SIZE;
     private Path scanPath;
     private ObservableList<Malware> malware = FXCollections.observableArrayList();
+    private int levelDepth;
+    private String currentFilePath;
 
-    public FileSystemTraverse(Client client, Path scanPath, ObservableList<Malware> data) {
+    public FileSystemTraverse(Client client, Path scanPath, ObservableList<Malware> data,int levelDepth) {
         this.client = client;
         this.scanPath = scanPath;
         this.malware = data;
+        this.levelDepth = levelDepth;
+    }
+
+    public int getInfectedFiles()
+    {
+        return infectedFiles;
+    }
+
+    public String getCurrentFilePath()
+    {
+        return currentFilePath;
     }
 
     @Override
@@ -51,10 +66,10 @@ public class FileSystemTraverse extends Task<ObservableList<Malware>> implements
                 Collection mimeTypes = MimeUtil.getMimeTypes(newFile);
                 System.out.println("Regular file : " + filePath);
                 System.out.println("Type of file : " + mimeTypes);
-                updateTitle(filePath.toString());
+                currentFilePath = filePath.toString();
                 boolean mime = false;
                 for (Object mimeType : mimeTypes) {
-                    if (mimeType.toString().equals("application/zip")) {
+                    if (mimeType.toString().equals(ZIP_MIME)) {
                         mime = true;
                     }
                 }
@@ -89,7 +104,7 @@ public class FileSystemTraverse extends Task<ObservableList<Malware>> implements
             for (HashSignature signature : signatures) {
                 if (signature.getSignature().equals(hashOfFile)) {
                     infectedFiles++;
-                    updateMessage("Infected files: " + infectedFiles);
+//                    updateMessage("Infected files: " + infectedFiles);
                     malware.add(new Malware(filePath, FileUtils.byteCountToDisplaySize(fileSize), fileName));
                 }
             }
@@ -115,7 +130,7 @@ public class FileSystemTraverse extends Task<ObservableList<Malware>> implements
     private String readInputAndGenerateHash(InputStream fileInputStream) {
         String md5hash = "";
         try {
-            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            MessageDigest messageDigest = MessageDigest.getInstance(DIGEST_ALGORITHM);
             md5hash = getHash(fileInputStream, messageDigest, 2048);
             messageDigest.reset();
         } catch (NoSuchAlgorithmException e) {
@@ -146,10 +161,10 @@ public class FileSystemTraverse extends Task<ObservableList<Malware>> implements
     public FileVisitResult postVisitDirectory(Path dir,
                                               IOException exc) {
         Objects.requireNonNull(dir);
-        if (files.contains(dir.toString())) {
+       /* if (files.contains(dir.toString())) {
             files.remove(dir.toString());
-            updateProgress(FIRST_LAYER_OF_DIRS_SIZE - files.size(), FIRST_LAYER_OF_DIRS_SIZE);
-        }
+//            updateProgress(FIRST_LAYER_OF_DIRS_SIZE - files.size(), FIRST_LAYER_OF_DIRS_SIZE);
+        }*/
         System.out.format("Directory: %s%n", dir);
         return FileVisitResult.CONTINUE;
     }
@@ -164,7 +179,7 @@ public class FileSystemTraverse extends Task<ObservableList<Malware>> implements
 
     @Override
     protected ObservableList<Malware> call() {
-        if (scanPath.toFile().listFiles() != null) {
+      /*  if (scanPath.toFile().listFiles() != null) {
             files = new ArrayList<>(Arrays.asList((scanPath.toFile()).list(new FilenameFilter() {
                 @Override
                 public boolean accept(File dir, String name) {
@@ -175,11 +190,13 @@ public class FileSystemTraverse extends Task<ObservableList<Malware>> implements
                 files.set(i, "D:\\" + files.get(i));
             }
             FIRST_LAYER_OF_DIRS_SIZE = files.size();
-        }
-        updateProgress(0, FIRST_LAYER_OF_DIRS_SIZE);
-        updateMessage("Infected files: 0");
+        }*/
+//        updateProgress(0, FIRST_LAYER_OF_DIRS_SIZE);
+//        updateMessage("Infected files: 0");
+        Set<FileVisitOption> opts = Collections.emptySet();
         try {
-            Files.walkFileTree(scanPath, this);
+//            Files.walkFileTree(scanPath, this);
+            Files.walkFileTree(scanPath,opts,levelDepth,this);
         } catch (IOException e) {
             e.printStackTrace(System.err);
         }

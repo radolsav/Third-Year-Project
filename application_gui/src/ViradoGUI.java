@@ -24,8 +24,6 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
-
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -34,13 +32,9 @@ import java.nio.file.Paths;
  * at University of Manchester. Third-Year-Project
  */
 public class ViradoGUI extends Application {
-    private static final String FOUND_MALWARE = "Found malware:";
-    private static final String SCAN_SUCCESSFUL = "Scan completed successfully!";
-    private static final String COMPLETED_MSG = "Completed";
     private static final String FILE_NAME_COLUMN = "File name";
     private static final String SIZE_COLUMN = "Size";
     private static final String PATH_COLUMN = "Path";
-
 
     private TableView<Malware> tableView = new TableView<>();
     private ObservableList<Malware> malwareData = FXCollections.observableArrayList();
@@ -53,12 +47,9 @@ public class ViradoGUI extends Application {
     private static final String FULL_SCAN = "Full Scan";
     private static final String CUSTOM_SCAN = "Custom Scan";
     private static final String OVERVIEW = "Overview";
-    private static final String SCAN = "Scan";
+
     private static final String PAUSE = "Pause";
     private static final String SCANNING = "Scanning...";
-    private static final String PAUSED = "Paused";
-    private static final String RESUME = "Resume";
-    private static final String STOPPED = "Stopped";
     private static final String STOP = "Stop";
     private static final String APPLICATION_NAME = "Virado";
     private static final String GUI_CSS = "ViradoGUI.css";
@@ -66,6 +57,7 @@ public class ViradoGUI extends Application {
     private static final String SCAN_IMG = "/resources/images/magnifier.png";
     private static final String STOP_BUTTON_IMG = "/resources/images/stop.png";
     private static final String PAUSE_IMG = "/resources/images/pause.png";
+    private volatile Thread thread;
 
 
     public void start(final Stage primaryStage) {
@@ -76,7 +68,7 @@ public class ViradoGUI extends Application {
         tabbedPane.getTabs().add(overview_tab);
 
         final Tab scan_tab = new Tab();
-        scan_tab.setText(SCAN);
+        scan_tab.setText("Scan");
         final Button quickScanButton = new Button(QUICK_SCAN);
         Button fullScanButton = new Button(FULL_SCAN);
         Button customScanButton = new Button(CUSTOM_SCAN);
@@ -90,7 +82,7 @@ public class ViradoGUI extends Application {
                 MimeUtil.registerMimeDetector(EXTENSION_MIME_DETECTOR);
 //        MimeUtil.registerMimeDetector("eu.medsea.mimeutil.detector.OpendesktopMimeDetector");
                 Path pathToScan = Paths.get("D:\\");
-                final CoordinatingTask task = new CoordinatingTask(client, malwareData);
+                final CoordinatingTask task = new CoordinatingTask(client, malwareData,pathToScan);
 
                 // Create progress HBox element with progress bar and progress indicator
                 final HBox progressHb = createProgressUI(task);
@@ -121,27 +113,8 @@ public class ViradoGUI extends Application {
                 infectedSoFarBox.setAlignment(Pos.CENTER);
 
                 VBox tableVbox = new VBox();
-                final Label malwareLabel = new Label(FOUND_MALWARE);
-                tableView.setEditable(false);
-                tableVbox.setSpacing(5);
-                tableVbox.setPadding(new Insets(10, 10, 10, 10));
-                TableColumn<Malware, String> fileNameColumn = new TableColumn<>(FILE_NAME_COLUMN);
-                fileNameColumn.setCellValueFactory(
-                        new PropertyValueFactory<Malware, String>("fileName"));
-                TableColumn<Malware, String> fileSizeColumn = new TableColumn<>(SIZE_COLUMN);
-                fileSizeColumn.setCellValueFactory(
-                        new PropertyValueFactory<Malware, String>("size"));
-                TableColumn<Malware, Path> filePathColumn = new TableColumn<>(PATH_COLUMN);
-                filePathColumn.setCellValueFactory(
-                        new PropertyValueFactory<Malware, Path>("path"));
-                // bind columns to table so that when you resize table columns resize too.
-                fileNameColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.3));
-                filePathColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.4));
-                fileSizeColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.3));
-                tableView.setItems(malwareData);
-                tableView.getColumns().addAll(fileNameColumn, fileSizeColumn, filePathColumn);
-                tableVbox.getChildren().addAll(malwareLabel, tableView);
-                tableVbox.setAlignment(Pos.BOTTOM_CENTER);
+                createTable(tableVbox);
+
 
                 // Add HBoxes together to VBox and to the tab
                 final VBox vb = new VBox();
@@ -151,28 +124,23 @@ public class ViradoGUI extends Application {
                 scan_tab.setContent(vb);
 
                 // Start the thread
-                final Thread thread = new Thread(task);
+                thread = new Thread(task);
                 thread.setName("WalkFileTree");
                 thread.setDaemon(true);
-                try {
-                    client.ping();
-                } catch (IOException e1) {
-                    e1.printStackTrace(System.err);
-                }
                 thread.start();
 
                 // Interrupt thread if clicked.
                 stopButton.setOnAction(new EventHandler<ActionEvent>() {
                     @Override
                     public void handle(ActionEvent actionEvent) {
-                        thread.stop();
-                        scanLabel.setText(STOPPED);
+                        task.stop();
+                        scanLabel.setText("Stopped");
                     }
                 });
                 pauseButton.setOnAction(new EventHandler<ActionEvent>() {
                     @Override
                     public void handle(ActionEvent actionEvent) {
-                        pauseAction(thread, pauseButton, scanLabel);
+                        pauseAction(thread, pauseButton, scanLabel,task);
                     }
                 });
             }
@@ -182,13 +150,19 @@ public class ViradoGUI extends Application {
             public void handle(ActionEvent actionEvent) {
             }
         });
-        VBox vbox = new VBox();
+        fullScanButton.setOnAction(new EventHandler<ActionEvent>() {
+            @Override
+            public void handle(ActionEvent event) {
+            }
+        });
 
-        vbox.setSpacing(25);
-        vbox.setAlignment(Pos.CENTER);
-        vbox.setStyle("-fx-background-color: inherit ");
-        vbox.getChildren().addAll(quickScanButton, fullScanButton, customScanButton);
-        scan_tab.setContent(vbox);
+        VBox scanTabVbox = new VBox();
+
+        scanTabVbox.setSpacing(25);
+        scanTabVbox.setAlignment(Pos.CENTER);
+        scanTabVbox.setStyle("-fx-background-color: inherit ");
+        scanTabVbox.getChildren().addAll(quickScanButton, fullScanButton, customScanButton);
+        scan_tab.setContent(scanTabVbox);
         tabbedPane.getTabs().add(scan_tab);
 
         Tab statistics_tab = new Tab();
@@ -219,16 +193,42 @@ public class ViradoGUI extends Application {
         });
     }
 
+    private void createTable(VBox tableVbox) {
+        final Label malwareLabel = new Label("Found malware:");
+        tableView.setEditable(false);
+        tableVbox.setSpacing(5);
+        tableVbox.setPadding(new Insets(10, 10, 10, 10));
+        TableColumn<Malware, String> fileNameColumn = new TableColumn<>(FILE_NAME_COLUMN);
+        fileNameColumn.setCellValueFactory(
+                new PropertyValueFactory<Malware, String>("fileName"));
+        TableColumn<Malware, String> fileSizeColumn = new TableColumn<>(SIZE_COLUMN);
+        fileSizeColumn.setCellValueFactory(
+                new PropertyValueFactory<Malware, String>("size"));
+        TableColumn<Malware, Path> filePathColumn = new TableColumn<>(PATH_COLUMN);
+        filePathColumn.setCellValueFactory(
+                new PropertyValueFactory<Malware, Path>("path"));
+        // bind columns to table so that when you resize table columns resize too.
+        fileNameColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.3));
+        filePathColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.4));
+        fileSizeColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.3));
+        tableView.setItems(malwareData);
+        tableView.getColumns().add(fileNameColumn);
+        tableView.getColumns().add(fileSizeColumn);
+        tableView.getColumns().add(filePathColumn);
+        tableVbox.getChildren().addAll(malwareLabel, tableView);
+        tableVbox.setAlignment(Pos.BOTTOM_CENTER);
+    }
+
     private void updateSucceededUI(Labeled infectedSoFarLabel, HBox progressHb, Label currentFileLabel, Label scanLabel, CoordinatingTask task) {
         infectedSoFarLabel.textProperty().unbind();
-        infectedSoFarLabel.setText(SCAN_SUCCESSFUL);
+        infectedSoFarLabel.setText("Scan completed successfully!");
         ((ProgressBar) (progressHb.getChildren().get(1))).progressProperty().unbind();
         ((ProgressBar) (progressHb.getChildren().get(1))).setProgress(1);
         ((ProgressIndicator) (progressHb.getChildren().get(2))).progressProperty().unbind();
         ((ProgressIndicator) (progressHb.getChildren().get(2))).setProgress(1);
         currentFileLabel.textProperty().unbind();
         currentFileLabel.setText("");
-        scanLabel.setText(COMPLETED_MSG);
+        scanLabel.setText("Completed");
         malwareData = task.getValue();
     }
 
@@ -269,13 +269,15 @@ public class ViradoGUI extends Application {
         return progresshb;
     }
 
-    private void pauseAction(Thread thread, Button pauseButton, Label scanLabel) {
+    private void pauseAction(Thread thread, Button pauseButton, Label scanLabel, CoordinatingTask task) {
         if (!thread.isInterrupted() && pauseButton.getText().equals(PAUSE)) {
-            thread.suspend();
-            scanLabel.setText(PAUSED);
-            pauseButton.setText(RESUME);
+            task.pause();
+//            thread.suspend();
+            scanLabel.setText("Paused");
+            pauseButton.setText("Resume");
         } else {
-            thread.resume();
+            task.unPause();
+//            thread.resume();
             scanLabel.setText(SCANNING);
             pauseButton.setText(PAUSE);
         }

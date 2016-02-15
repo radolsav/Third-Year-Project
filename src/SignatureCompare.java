@@ -3,13 +3,14 @@ import io.orchestrate.client.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.concurrent.SynchronousQueue;
 
 /**
  * Created by Radoslav Ralinov on 30/12/2015. All rights reserved. Created as part of the Third Year Project
  * at University of Manchester. Third-Year-Project
  */
 public class SignatureCompare {
+
+    private static final String HASH_COLLECTION = "HashSignatures";
 
     @JsonIgnoreProperties
     public static ArrayList<HashSignature> compareHashSignatures(Client client, long size) {
@@ -23,7 +24,7 @@ public class SignatureCompare {
 
         String luceneQuery = "value.size: " + size;
         SearchResults<HashSignature> results =
-                client.searchCollection("HashSignatures")
+                client.searchCollection(HASH_COLLECTION)
                         .limit(20)
                         .get(HashSignature.class, luceneQuery)
                         .get();
