@@ -25,27 +25,25 @@ public class FileSystemTraverse extends Task<ObservableList<Malware>> implements
     private static final String DIGEST_ALGORITHM = "SHA-256";
     private Client client;
     private int infectedFiles;
-//    private ArrayList<String> files;
+    //    private ArrayList<String> files;
 //    private int FIRST_LAYER_OF_DIRS_SIZE;
     private Path scanPath;
     private ObservableList<Malware> malware = FXCollections.observableArrayList();
     private int levelDepth;
     private String currentFilePath;
 
-    public FileSystemTraverse(Client client, Path scanPath, ObservableList<Malware> data,int levelDepth) {
+    public FileSystemTraverse(Client client, Path scanPath, ObservableList<Malware> data, int levelDepth) {
         this.client = client;
         this.scanPath = scanPath;
         this.malware = data;
         this.levelDepth = levelDepth;
     }
 
-    public int getInfectedFiles()
-    {
+    public int getInfectedFiles() {
         return infectedFiles;
     }
 
-    public String getCurrentFilePath()
-    {
+    public String getCurrentFilePath() {
         return currentFilePath;
     }
 
@@ -73,7 +71,7 @@ public class FileSystemTraverse extends Task<ObservableList<Malware>> implements
                         mime = true;
                     }
                 }
-                if (mime) {
+                if (mime && Files.exists(filePath,LinkOption.NOFOLLOW_LINKS)) {
                     unzipFile(filePath);
                 } else if (Files.exists(filePath,
                         LinkOption.NOFOLLOW_LINKS)) {
@@ -97,7 +95,7 @@ public class FileSystemTraverse extends Task<ObservableList<Malware>> implements
         } catch (InterruptedException exc) {
             exc.printStackTrace(System.err);
         }
-//    SignatureCompare.compareByteSignatures(client,"58354f2150254041505b345c505a58353428505e2937434329377d24454943415dfsdf");
+        boolean alreadyAdded = false;
         if (!signatures.isEmpty()) {
             String hashOfFile = readInputAndGenerateHash(inputStream);
             // Might be more than one signatures with the same size
@@ -106,9 +104,32 @@ public class FileSystemTraverse extends Task<ObservableList<Malware>> implements
                     infectedFiles++;
 //                    updateMessage("Infected files: " + infectedFiles);
                     malware.add(new Malware(filePath, FileUtils.byteCountToDisplaySize(fileSize), fileName));
+                    alreadyAdded = true;
                 }
             }
         }
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException exc) {
+            exc.printStackTrace(System.err);
+        }
+        if (!alreadyAdded) {
+            try {
+                byte[] firstFourKilobytes = new byte[4000];
+                File file = new File(filePath.toString());
+                InputStream input = new FileInputStream(file);
+                //noinspection ResultOfMethodCallIgnored
+                input.read(firstFourKilobytes);
+                input.close();
+                if (SignatureCompare.compareByteSignatures(firstFourKilobytes, client)) {
+                    infectedFiles++;
+                    malware.add(new Malware(filePath, FileUtils.byteCountToDisplaySize(fileSize), fileName));
+                }
+            } catch (IOException exception) {
+                exception.printStackTrace(System.err);
+            }
+        }
+
     }
 
     private void unzipFile(Path path) {
@@ -196,7 +217,7 @@ public class FileSystemTraverse extends Task<ObservableList<Malware>> implements
         Set<FileVisitOption> opts = Collections.emptySet();
         try {
 //            Files.walkFileTree(scanPath, this);
-            Files.walkFileTree(scanPath,opts,levelDepth,this);
+            Files.walkFileTree(scanPath, opts, levelDepth, this);
         } catch (IOException e) {
             e.printStackTrace(System.err);
         }

@@ -1,8 +1,11 @@
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.orchestrate.client.*;
+import org.ahocorasick.trie.Emit;
+import org.ahocorasick.trie.Trie;
 
-import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by Radoslav Ralinov on 30/12/2015. All rights reserved. Created as part of the Third Year Project
@@ -11,9 +14,10 @@ import java.util.ArrayList;
 public class SignatureCompare {
 
     private static final String HASH_COLLECTION = "HashSignatures";
+    private static final String BYTE_COLLECTION = "ByteSignatures";
 
     @JsonIgnoreProperties
-    public static ArrayList<HashSignature> compareHashSignatures(Client client, long size) {
+    public static  ArrayList<HashSignature> compareHashSignatures(Client client, long size) {
 //    HashSignature signature1 = new HashSignature("275A021BBFB6489E54D471899F7DB9D1663FC695EC2FE2A2C4538AABF651FD0F",68,"eicar.com");
 
 //    KvMetadata signatureMeta = client.postValue("HashSignatures", signature1).get();
@@ -21,13 +25,26 @@ public class SignatureCompare {
             client.kv("HashSignatures", "0db20ca56640ae01")
                     .get(HashSignature.class)
                     .get();*/
+        ArrayList<HashSignature> hashSignature = new ArrayList<>();
+        try {
+            String luceneQuery = "value.size: " + size;
+            SearchResults<HashSignature> results =
+                    client.searchCollection(HASH_COLLECTION)
+                            .limit(20)
+                            .get(HashSignature.class, luceneQuery)
+                            .get(5000L, TimeUnit.MILLISECONDS);
+            if (results.getCount() == 0) {
+                System.out.println("No threat found!");
+            } else {
+                for (Result<HashSignature> signature : results) {
+                    KvObject<HashSignature> kvObject = signature.getKvObject();
+                    hashSignature.add(kvObject.getValue());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
-        String luceneQuery = "value.size: " + size;
-        SearchResults<HashSignature> results =
-                client.searchCollection(HASH_COLLECTION)
-                        .limit(20)
-                        .get(HashSignature.class, luceneQuery)
-                        .get();
    /* try {
       client.close();
     }
@@ -35,45 +52,35 @@ public class SignatureCompare {
     {
       exception.printStackTrace(System.err);
     }*/
-        ArrayList<HashSignature> hashSignature = new ArrayList<>();
-        if (results.getCount() == 0) {
-            System.out.println("No threat found!");
-        } else {
-            for (Result<HashSignature> signature : results) {
-                KvObject<HashSignature> kvObject = signature.getKvObject();
-                hashSignature.add(kvObject.getValue());
-            }
-        }
+
         return hashSignature;
     }
 
-    public static boolean compareByteSignatures(Client client, String fileBytes) throws IOException {
-//    ByteSignature signature = new ByteSignature("58354f2150254041505b345c505a58353428505e2937434329377d2445494341522d5354414e4441","Eicar-test-signature");
-//    KvMetadata signatureMeta = client.postValue("ByteSignatures", signature).get();
+    @JsonIgnoreProperties
+    public static  boolean compareByteSignatures(byte[] fileBytes, Client client) {
+        /*String str = new String(fileBytes, "UTF-8"); // for UTF-8 encoding
+        ByteSignature signature = new ByteSignature(str,"Eicar-test-signature2");
+    KvMetadata signatureMeta = client.postValue("ByteSignatures", signature).get();*/
    /* KvList<ByteSignature> results =
             client.listCollection("ByteSignatures")
                     .limit(20)
                     .get(ByteSignature.class)
                     .get();*/
-
-        KvObject<ByteSignature> signatureKvObject =
-                client.kv("ByteSignatures", "0de0645dc840c6cb")
-                        .get(ByteSignature.class)
-                        .get();
-
-        AhoCorasick ahoCorasick = new AhoCorasick(1000);
-    /*for (KvObject<ByteSignature> signatureKvObject : results) {
-      // do something with the object*/
-        ByteSignature byteSignature = signatureKvObject.getValue();
-        ahoCorasick.addString(byteSignature.getSignature());
-//      System.out.println(signatureKvObject);
-//    }
-        int node = 0;
-        for (char ch : fileBytes.toCharArray()) {
-            node = ahoCorasick.transition(node, ch);
+        Collection<Emit> emits;
+        try {
+            String stringBytes = new String(fileBytes, "UTF-8"); // for UTF-8 encoding
+            KvObject<ByteSignature> signatureKvObject =
+                    client.kv(BYTE_COLLECTION, "0f9b8afa4c40f9fe")
+                            .get(ByteSignature.class)
+                            .get(5000L, TimeUnit.MILLISECONDS);
+            ByteSignature byteSignature = signatureKvObject.getValue();
+            Trie trie = Trie.builder().removeOverlaps().addKeyword(byteSignature.getSignature()).build();
+            emits = trie.parseText(stringBytes);
+            return !emits.isEmpty();
+        } catch (Exception e) {
+            e.printStackTrace(System.err);
         }
-        System.out.println(ahoCorasick.nodes[node].leaf);
-        return true;
+        return false;
     }
 }
 

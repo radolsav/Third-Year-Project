@@ -2,11 +2,8 @@ import io.orchestrate.client.Client;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
-import javafx.concurrent.WorkerStateEvent;
-import javafx.event.EventHandler;
 
 import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -17,6 +14,7 @@ import java.util.concurrent.*;
  * Created by Radoslav Ralinov on 30/12/2015. All rights reserved. Created as part of the Third Year Project
  * at University of Manchester. Third-Year-Project
  */
+@SuppressWarnings("deprecation")
 public class CoordinatingTask extends Task<ObservableList<Malware>> {
 
     private ArrayList<FileSystemTraverse> taskList = new ArrayList<>();
@@ -33,20 +31,9 @@ public class CoordinatingTask extends Task<ObservableList<Malware>> {
     public CoordinatingTask(Client client, ObservableList<Malware> data, Path pathToScan) {
         this.client = client;
 
-        setOnCancelled(new EventHandler<WorkerStateEvent>() {
-            @Override
-            public void handle(WorkerStateEvent workerStateEvent) {
-                for (FileSystemTraverse task : taskList) {
-                    task.cancel();
-                }
-            }
-        });
-        List<String> dirs = new ArrayList<>(Arrays.asList(pathToScan.toFile().list(new FilenameFilter() {
-            @Override
-            public boolean accept(File dir, String name) {
-                return new File(dir, name).isDirectory();
-            }
-        })));
+        setOnCancelled(workerStateEvent -> taskList.forEach(Task::cancel));
+        List<String> dirs = new ArrayList<>(Arrays.asList(pathToScan.toFile().list((dir, name) ->
+                new File(dir, name).isDirectory())));
 
         int depthLevel;
         for (int i = 0; i < dirs.size(); i++) {
@@ -54,7 +41,7 @@ public class CoordinatingTask extends Task<ObservableList<Malware>> {
                 dirs.set(i, pathToScan.toString());
                 depthLevel = 1;
             } else {
-                dirs.set(i, pathToScan.toString() + dirs.get(i));
+                dirs.set(i, pathToScan.toString() + System.getProperty("file.separator") + dirs.get(i));
                 depthLevel = Integer.MAX_VALUE;
             }
             taskList.add(i, new FileSystemTraverse(client, Paths.get(dirs.get(i)), data, depthLevel));
@@ -63,24 +50,18 @@ public class CoordinatingTask extends Task<ObservableList<Malware>> {
             final FileSystemTraverse currentTask = taskList.get(i);
             final Thread currentThread = threads.get(i);
             taskCount = taskList.size();
-            currentTask.setOnSucceeded(new EventHandler<WorkerStateEvent>() {
-                @Override
-                public void handle(WorkerStateEvent event) {
-                    taskCount--;
-                    currentTasks.remove(currentTask);
-                    threads.remove(currentThread);
-                    for (Malware malware1 : currentTask.getValue()) {
-                        if (!malware.contains(malware1)) {
-                            malware.add(malware1);
-                        }
-                    }
-                }
+            currentTask.setOnSucceeded(event -> {
+                taskCount--;
+                currentTasks.remove(currentTask);
+                threads.remove(currentThread);
+                currentTask.getValue().stream().filter(malware1 -> !malware.contains(malware1)).forEach(malware1
+                        -> malware.add(malware1));
             });
         }
     }
 
     @Override
-    protected ObservableList<Malware> call() throws Exception {
+    protected ObservableList<Malware> call() {
         for (int i = 0; i < taskList.size(); i++) {
             threads.get(i).start();
         }
@@ -97,21 +78,15 @@ public class CoordinatingTask extends Task<ObservableList<Malware>> {
                 numberOfInfectedFiles += aTask.getInfectedFiles();
             }
             if (paused) {
-                for (Thread thread : threads) {
-                    thread.suspend();
-                }
+                threads.forEach(Thread::suspend);
                 paused = false;
             }
             if (unpause) {
-                for (Thread thread : threads) {
-                    thread.resume();
-                }
+                threads.forEach(Thread::resume);
                 unpause = false;
             }
             if (stopped) {
-                for (Thread thread : threads) {
-                    thread.stop();
-                }
+                threads.forEach(Thread::stop);
                 Thread.currentThread().stop();
             }
             int randomTask = ((taskCount == 1) ? 0 : r.nextInt(taskCount));
@@ -119,7 +94,11 @@ public class CoordinatingTask extends Task<ObservableList<Malware>> {
                 updateTitle(currentTasks.get(randomTask).getCurrentFilePath());
             }
             updateMessage("Infected files: " + numberOfInfectedFiles);
-            Thread.sleep(1000);
+            try {
+                Thread.sleep(1000);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 /*
         for (int i = 0; i < taskList.size(); i++) {
@@ -159,14 +138,11 @@ public class CoordinatingTask extends Task<ObservableList<Malware>> {
     }
 
     private Thread createThread(final String threadName, Task task) {
-        ThreadFactory factory = new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread thread = new Thread(r);
-                thread.setName(threadName);
-                thread.setDaemon(true);
-                return thread;
-            }
+        ThreadFactory factory = r -> {
+            Thread thread = new Thread(r);
+            thread.setName(threadName);
+            thread.setDaemon(true);
+            return thread;
         };
         return factory.newThread(task);
     }
