@@ -25,25 +25,45 @@ public class CoordinatingTask extends Task<ObservableList<Malware>> {
     private int taskCount = 0;
     private int numberOfInfectedFiles = 0;
     private boolean paused = false;
-    private boolean unpause = false;
+    private boolean resume = false;
     private boolean stopped = false;
 
     public CoordinatingTask(Client client, ObservableList<Malware> data, Path pathToScan) {
         this.client = client;
 
         setOnCancelled(workerStateEvent -> taskList.forEach(Task::cancel));
-        List<String> dirs = new ArrayList<>(Arrays.asList(pathToScan.toFile().list((dir, name) ->
-                new File(dir, name).isDirectory())));
+        List<String> dirs = new ArrayList<>();
+        if (pathToScan.toFile().isDirectory()) {
+            dirs = new ArrayList<>(Arrays.asList(pathToScan.toFile().list((dir, name) ->
+                    new File(dir, name).isDirectory())));
+        }
+
+        boolean fullScan = false;
+        if (pathToScan.toString().equals("Desktop") || pathToScan.toString().equals("Computer")) {
+            File[] roots = File.listRoots();
+            List<String> rootList = new ArrayList<>();
+            for (File root : roots) {
+                rootList.add(root.toString());
+            }
+            dirs.addAll(rootList);
+            fullScan = true;
+        }
+
+        if (dirs.size() == 0 && !fullScan)
+            dirs.add("Single file case");
 
         int depthLevel;
         for (int i = 0; i < dirs.size(); i++) {
-            if (i == 0) {
-                dirs.set(i, pathToScan.toString());
-                depthLevel = 1;
-            } else {
-                dirs.set(i, pathToScan.toString() + System.getProperty("file.separator") + dirs.get(i));
+            if (!fullScan)
+                if (i == 0) {
+                    dirs.set(i, pathToScan.toString());
+                    depthLevel = 1;
+                } else {
+                    dirs.set(i, pathToScan.toString() + System.getProperty("file.separator") + dirs.get(i));
+                    depthLevel = Integer.MAX_VALUE;
+                }
+            else
                 depthLevel = Integer.MAX_VALUE;
-            }
             taskList.add(i, new FileSystemTraverse(client, Paths.get(dirs.get(i)), data, depthLevel));
             currentTasks.add(taskList.get(i));
             threads.add(i, createThread("Thread" + i, taskList.get(i)));
@@ -81,9 +101,9 @@ public class CoordinatingTask extends Task<ObservableList<Malware>> {
                 threads.forEach(Thread::suspend);
                 paused = false;
             }
-            if (unpause) {
+            if (resume) {
                 threads.forEach(Thread::resume);
-                unpause = false;
+                resume = false;
             }
             if (stopped) {
                 threads.forEach(Thread::stop);
@@ -100,27 +120,6 @@ public class CoordinatingTask extends Task<ObservableList<Malware>> {
                 e.printStackTrace();
             }
         }
-/*
-        for (int i = 0; i < taskList.size(); i++) {
-            executors.get(i).submit(taskList.get(i));
-        }
-
-        for (int i = 0; i < taskList.size(); i++) {
-            executors.get(i).shutdown();
-        }
-
-        try {
-            for (int i = 0; i < taskList.size(); i++) {
-                executors.get(i).awaitTermination(1, TimeUnit.DAYS);
-            }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        for (int i = 0; i < taskList.size(); i++) {
-            if (executors.get(i).isShutdown() && taskList.get(i).isDone()) {
-                malware.addAll(taskList.get(i).getValue());
-            }
-        }*/
 
         return malware;
     }
@@ -130,7 +129,7 @@ public class CoordinatingTask extends Task<ObservableList<Malware>> {
     }
 
     public void unPause() {
-        unpause = true;
+        resume = true;
     }
 
     public void stop() {

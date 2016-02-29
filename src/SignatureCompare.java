@@ -32,7 +32,7 @@ public class SignatureCompare {
                     client.searchCollection(HASH_COLLECTION)
                             .limit(20)
                             .get(HashSignature.class, luceneQuery)
-                            .get(5000L, TimeUnit.MILLISECONDS);
+                            .get(7500L, TimeUnit.MILLISECONDS);
             if (results.getCount() == 0) {
                 System.out.println("No threat found!");
             } else {
@@ -72,7 +72,7 @@ public class SignatureCompare {
             KvObject<ByteSignature> signatureKvObject =
                     client.kv(BYTE_COLLECTION, "0f9b8afa4c40f9fe")
                             .get(ByteSignature.class)
-                            .get(5000L, TimeUnit.MILLISECONDS);
+                            .get(7500L, TimeUnit.MILLISECONDS);
             ByteSignature byteSignature = signatureKvObject.getValue();
             Trie trie = Trie.builder().removeOverlaps().addKeyword(byteSignature.getSignature()).build();
             emits = trie.parseText(stringBytes);

@@ -19,10 +19,14 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+
 
 /**
  * Created by Radoslav Ralinov on 30/12/2015. All rights reserved. Created as part of the Third Year Project
@@ -32,6 +36,8 @@ public class ViradoGUI extends Application {
     private static final String FILE_NAME_COLUMN = "File name";
     private static final String SIZE_COLUMN = "Size";
     private static final String PATH_COLUMN = "Path";
+    private static final int APPLICATION_MAX_HEIGHT = 500;
+    private static final int APPLICATION_MAX_WIDTH = 500;
 
     private TableView<Malware> tableView = new TableView<>();
     private ObservableList<Malware> malwareData = FXCollections.observableArrayList();
@@ -40,9 +46,6 @@ public class ViradoGUI extends Application {
     private static final String MAGIC_MIME_DETECTOR = "eu.medsea.mimeutil.detector.MagicMimeMimeDetector";
     private static final String EXTENSION_MIME_DETECTOR = "eu.medsea.mimeutil.detector.ExtensionMimeDetector";
 
-    private static final String QUICK_SCAN = "Quick Scan";
-    private static final String FULL_SCAN = "Full Scan";
-    private static final String CUSTOM_SCAN = "Custom Scan";
     private static final String OVERVIEW = "Overview";
 
     private static final String PAUSE = "Pause";
@@ -55,84 +58,34 @@ public class ViradoGUI extends Application {
     private static final String STOP_BUTTON_IMG = "/resources/images/stop.png";
     private static final String PAUSE_IMG = "/resources/images/pause.png";
     private volatile Thread thread;
+    private final Tab scan_tab = new Tab();
 
+    protected Button quickScanButton = new Button("Quick Scan");
+    protected Button customScanButton = new Button("Custom Scan");
+    protected Button fullScanButton = new Button("Full Scan");
 
     public void start(final Stage primaryStage) {
         final TabPane tabbedPane = new TabPane();
         Tab overview_tab = new Tab();
         overview_tab.setText(OVERVIEW);
-        overview_tab.setContent(new Rectangle(400, 400, Color.DEEPSKYBLUE));
+//        Rectangle rectangle = new Rectangle(400, 400, Color.DEEPSKYBLUE);
+        TextArea textArea = new TextArea("");
+        textArea.setEditable(false);
+//        textArea.setPrefSize( Double.MAX_VALUE, Double.MAX_VALUE );
+        textArea.prefWidthProperty().bind(tabbedPane.tabMaxWidthProperty());
+        textArea.prefHeightProperty().bind(tabbedPane.tabMaxHeightProperty());
+        textArea.setFont(new Font(12));
+//        textArea.setBackground();
+        StackPane stackPane = new StackPane();
+        stackPane.getChildren().addAll(textArea);
+        overview_tab.setContent(stackPane);
         tabbedPane.getTabs().add(overview_tab);
 
-        final Tab scan_tab = new Tab();
         scan_tab.setText("Scan");
-        final Button quickScanButton = new Button(QUICK_SCAN);
-        Button fullScanButton = new Button(FULL_SCAN);
-        Button customScanButton = new Button(CUSTOM_SCAN);
-        quickScanButton.setMinSize(100, 100);
-        fullScanButton.setMinSize(100, 100);
-        customScanButton.setMinSize(100, 100);
-        quickScanButton.setOnAction(e -> {
-            MimeUtil.registerMimeDetector(MAGIC_MIME_DETECTOR);
-            MimeUtil.registerMimeDetector(EXTENSION_MIME_DETECTOR);
-//        MimeUtil.registerMimeDetector("eu.medsea.mimeutil.detector.OpendesktopMimeDetector");
-            Path pathToScan = Paths.get("D:\\");
-            final CoordinatingTask task = new CoordinatingTask(client, malwareData, pathToScan);
 
-            // Create progress HBox element with progress bar and progress indicator
-            final HBox progressHb = createProgressUI(task);
-            final Label scanLabel = (Label) progressHb.getChildren().get(0);
-//        scanLabel.textProperty().bind(task.messageProperty());
-
-            final HBox currentFIleHBox = new HBox();
-            final Label currentFileLabel = new Label();
-            currentFileLabel.textProperty().bind(task.titleProperty());
-            currentFIleHBox.setAlignment(Pos.CENTER);
-            currentFIleHBox.getChildren().addAll(currentFileLabel);
-
-            // Create progress buttons HBox
-            HBox processButtons = createButtonsUI();
-            final Button pauseButton = (Button) processButtons.getChildren().get(0);
-            final Button stopButton = (Button) processButtons.getChildren().get(1);
-
-            final HBox infectedSoFarBox = new HBox();
-            final Labeled infectedSoFarLabel = new Label();
-            infectedSoFarLabel.textProperty().bind(task.messageProperty());
-            task.setOnSucceeded(workerStateEvent -> updateSucceededUI(infectedSoFarLabel, progressHb, currentFileLabel, scanLabel, task));
-            infectedSoFarBox.getChildren().addAll(infectedSoFarLabel);
-            infectedSoFarBox.setAlignment(Pos.CENTER);
-
-            VBox tableVbox = new VBox();
-            createTable(tableVbox);
-
-
-            // Add HBoxes together to VBox and to the tab
-            final VBox vb = new VBox();
-            vb.setSpacing(5);
-            vb.setAlignment(Pos.CENTER);
-            vb.getChildren().addAll(processButtons, currentFIleHBox, progressHb, infectedSoFarBox, tableVbox);
-            scan_tab.setContent(vb);
-
-            // Start the thread
-            thread = new Thread(task);
-            thread.setName("WalkFileTree");
-            thread.setDaemon(true);
-            thread.start();
-
-            // Interrupt thread if clicked.
-            stopButton.setOnAction(actionEvent -> {
-                task.stop();
-                scanLabel.setText("Stopped");
-            });
-            pauseButton.setOnAction(actionEvent -> pauseAction(thread, pauseButton, scanLabel, task));
-        });
-        customScanButton.setOnAction(actionEvent -> {
-        });
-        fullScanButton.setOnAction(event -> {
-        });
+        initializeScanButtons();
 
         VBox scanTabVbox = new VBox();
-
         scanTabVbox.setSpacing(25);
         scanTabVbox.setAlignment(Pos.CENTER);
         scanTabVbox.setStyle("-fx-background-color: inherit ");
@@ -142,19 +95,20 @@ public class ViradoGUI extends Application {
 
         Tab statistics_tab = new Tab();
         statistics_tab.setText("Statistics");
-        statistics_tab.setContent(new Rectangle(400, 400, Color.DEEPSKYBLUE));
+        statistics_tab.setContent(new Rectangle(APPLICATION_MAX_WIDTH, APPLICATION_MAX_HEIGHT, Color.DEEPSKYBLUE));
         tabbedPane.getTabs().add(statistics_tab);
 
-        tabbedPane.rotateGraphicProperty();
-        tabbedPane.setSide(Side.LEFT);
-        tabbedPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        tabbedPane.rotateGraphicProperty();
+        initializeTabbedPane(tabbedPane);
+
         StackPane root = new StackPane();
         root.getChildren().add(tabbedPane);
 
-        Scene scene = new Scene(root, 400, 400);
+        Scene scene = new Scene(root, APPLICATION_MAX_WIDTH, APPLICATION_MAX_HEIGHT);
         scene.getStylesheets().add(GUI_CSS);
         primaryStage.setTitle(APPLICATION_NAME);
+        primaryStage.setMaxWidth(APPLICATION_MAX_WIDTH);
+        primaryStage.setMaxHeight(APPLICATION_MAX_HEIGHT);
+        primaryStage.setResizable(false);
         primaryStage.setScene(scene);
         primaryStage.show();
 
@@ -165,7 +119,94 @@ public class ViradoGUI extends Application {
         });
     }
 
-    private void createTable(VBox tableVbox) {
+    private void initializeScanButtons() {
+        quickScanButton.setMinSize(100, 100);
+        fullScanButton.setMinSize(100, 100);
+        customScanButton.setMinSize(100, 100);
+        quickScanButton.setTooltip(new Tooltip("Scan vulnerable directories"));
+        fullScanButton.setTooltip(new Tooltip("Do a full scan"));
+        customScanButton.setTooltip(new Tooltip("Choose folder/disk/file to scan"));
+
+        CustomScanDialog dialog = new CustomScanDialog();
+        quickScanButton.setOnAction(e -> {
+            Path pathToScan = Paths.get("D:\\");
+            scanProcessTabUI(pathToScan);
+        });
+        customScanButton.setOnAction(actionEvent -> {
+            dialog.start(new Stage(), this);
+            customScanButton.setDisable(true);
+            quickScanButton.setDisable(true);
+            fullScanButton.setDisable(true);
+        });
+        fullScanButton.setOnAction(event -> scanProcessTabUI(Paths.get("Computer")));
+
+    }
+
+    protected void scanProcessTabUI(Path pathToScan) {
+        MimeUtil.registerMimeDetector(MAGIC_MIME_DETECTOR);
+        MimeUtil.registerMimeDetector(EXTENSION_MIME_DETECTOR);
+//        MimeUtil.registerMimeDetector("eu.medsea.mimeutil.detector.OpendesktopMimeDetector");
+        final CoordinatingTask task = new CoordinatingTask(client, malwareData, pathToScan);
+
+        // Create progress HBox element with progress bar and progress indicator
+        final HBox progressHb = createProgressUI(task);
+        final Label scanLabel = (Label) progressHb.getChildren().get(0);
+//        scanLabel.textProperty().bind(task.essageProperty());
+
+        final HBox currentFIleHBox = new HBox();
+        final Label currentFileLabel = new Label();
+        currentFileLabel.textProperty().bind(task.titleProperty());
+        currentFIleHBox.setAlignment(Pos.CENTER);
+        currentFIleHBox.getChildren().addAll(currentFileLabel);
+
+        // Create progress buttons HBox
+        HBox processButtons = createProcessButtonsUI();
+        final Button pauseButton = (Button) processButtons.getChildren().get(0);
+        final Button stopButton = (Button) processButtons.getChildren().get(1);
+
+        final HBox infectedSoFarBox = new HBox();
+        final Labeled infectedSoFarLabel = new Label();
+        infectedSoFarLabel.textProperty().bind(task.messageProperty());
+        task.setOnSucceeded(workerStateEvent -> updateSucceededUI(infectedSoFarLabel, progressHb, currentFileLabel, scanLabel, task));
+        infectedSoFarBox.getChildren().addAll(infectedSoFarLabel);
+        infectedSoFarBox.setAlignment(Pos.CENTER);
+
+        VBox tableVbox = new VBox();
+        createMalwareTable(tableVbox);
+
+        // Add HBoxes together to VBox and to the tab
+        final VBox vb = new VBox();
+        vb.setSpacing(5);
+        vb.setAlignment(Pos.CENTER);
+        vb.getChildren().addAll(processButtons, currentFIleHBox, progressHb, infectedSoFarBox, tableVbox);
+        scan_tab.setContent(vb);
+
+        // Start the thread
+        thread = new Thread(task);
+        thread.setName("WalkFileTree");
+        thread.setDaemon(true);
+        thread.start();
+
+        // Interrupt thread if clicked.
+        stopButton.setOnAction(actionEvent -> {
+            if (!task.isDone()) {
+                task.stop();
+                scanLabel.setText("Stopped");
+            }
+        });
+        pauseButton.setOnAction(actionEvent -> pauseAction(thread, pauseButton, scanLabel, task));
+    }
+
+
+    private void initializeTabbedPane(TabPane tabbedPane) {
+        tabbedPane.rotateGraphicProperty();
+        tabbedPane.setSide(Side.LEFT);
+        tabbedPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        tabbedPane.rotateGraphicProperty();
+        tabbedPane.setMaxSize(APPLICATION_MAX_WIDTH, APPLICATION_MAX_HEIGHT);
+    }
+
+    private void createMalwareTable(VBox tableVbox) {
         final Label malwareLabel = new Label("Found malware:");
         tableView.setEditable(false);
         tableVbox.setSpacing(5);
@@ -183,6 +224,34 @@ public class ViradoGUI extends Application {
         fileNameColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.3));
         filePathColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.4));
         fileSizeColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.3));
+
+        MenuItem deleteMenuItem = new MenuItem("Delete");
+        deleteMenuItem.setOnAction(event -> {
+            try {
+                Malware selectedMalware = tableView.getSelectionModel().getSelectedItem();
+                if (selectedMalware != null) {
+                    malwareData.remove(selectedMalware);
+                    Files.delete(selectedMalware.getPath());
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+
+        MenuItem quarantineMenuItem = new MenuItem("Quarantine");
+        quarantineMenuItem.setOnAction(event -> {
+            Malware selectedMalware = tableView.getSelectionModel().getSelectedItem();
+            if (selectedMalware != null) {
+                selectedMalware.getPath();
+            }
+        });
+        ContextMenu contextMenu = new ContextMenu();
+        contextMenu.setAutoFix(true);
+        contextMenu.setHideOnEscape(true);
+        contextMenu.setPrefSize(40, 40);
+        contextMenu.getItems().addAll(deleteMenuItem, quarantineMenuItem);
+
+        tableView.setContextMenu(contextMenu);
         tableView.setItems(malwareData);
         tableView.getColumns().add(fileNameColumn);
         tableView.getColumns().add(fileSizeColumn);
@@ -204,7 +273,7 @@ public class ViradoGUI extends Application {
         malwareData = task.getValue();
     }
 
-    private HBox createButtonsUI() {
+    private HBox createProcessButtonsUI() {
         // Create stop and pause buttons
         Image imageStop = new Image(getClass().getResourceAsStream(STOP_BUTTON_IMG));
         final Button stopButton = new Button(STOP, new ImageView(imageStop));

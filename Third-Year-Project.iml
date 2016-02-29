@@ -45,5 +45,6 @@
       </library>
     </orderEntry>
     <orderEntry type="library" name="io.orchestrate:orchestrate-client:0.13.0" level="project" />
+    <orderEntry type="library" name="org.ahocorasick:ahocorasick:0.3.0" level="project" />
   </component>
 </module>

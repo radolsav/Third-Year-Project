@@ -1,11 +1,9 @@
 import javafx.application.Application;
-import javafx.geometry.Pos;
 import javafx.scene.Group;
 import javafx.scene.Scene;
-import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
-import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
@@ -23,16 +21,17 @@ public class ProgressDialog extends Application {
 
   @Override
   public void start(Stage stage) {
+//    scene.getStylesheets().add("progresssample/Style.css");
     Group root = new Group();
     Scene scene = new Scene(root, 300, 150);
     scene.getStylesheets().add("progresssample/Style.css");
     stage.setScene(scene);
     stage.setTitle("Progress Controls");
 
-    final VBox vb = new VBox();
-    vb.setSpacing(5);
-    vb.getChildren().addAll(hbs);
-    scene.setRoot(vb);
+    final VBox vBox = new VBox();
+    vBox.setSpacing(5);
+    vBox.getChildren().addAll(hbs);
+//    scene.setRoot(vb);
     stage.show();
   }
 
