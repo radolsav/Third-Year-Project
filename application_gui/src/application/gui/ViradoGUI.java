@@ -13,6 +13,7 @@ import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.TableView;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
@@ -28,6 +29,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 
 import malware.scan.*;
 import images.*;
@@ -41,14 +44,14 @@ public class ViradoGUI extends Application {
     private static final String FILE_NAME_COLUMN = "File name";
     private static final String SIZE_COLUMN = "Size";
     private static final String PATH_COLUMN = "Path";
-    private static final int APPLICATION_MAX_HEIGHT = 500;
-    private static final int APPLICATION_MAX_WIDTH = 500;
+    private static final int APPLICATION_MAX_HEIGHT = 550;
+    private static final int APPLICATION_MAX_WIDTH = 550;
 
     private TableView<Malware> tableView = new TableView<>();
     private ObservableList<Malware> malwareData = FXCollections.observableArrayList();
 
     private static final Client client = OrchestrateClient.builder("e4f5cbf3-991a-41ab-aa6e-346d53c0ac2b")
-            .host("https://api.aws-eu-west-1.orchestrate.io").build();
+        .host("https://api.aws-eu-west-1.orchestrate.io").build();
     private static final String MAGIC_MIME_DETECTOR = "eu.medsea.mimeutil.detector.MagicMimeMimeDetector";
     private static final String EXTENSION_MIME_DETECTOR = "eu.medsea.mimeutil.detector.ExtensionMimeDetector";
 
@@ -68,6 +71,8 @@ public class ViradoGUI extends Application {
     protected Button quickScanButton = new Button("Quick Scan");
     protected Button customScanButton = new Button("Custom Scan");
     protected Button fullScanButton = new Button("Full Scan");
+
+    ArrayList<Malware> encryptedMalware = new ArrayList<>();
 
     public void start(final Stage primaryStage) {
         final TabPane tabbedPane = new TabPane();
@@ -137,12 +142,14 @@ public class ViradoGUI extends Application {
 
             scanProcessTabUI(pathToScan);
         });
+
         customScanButton.setOnAction(actionEvent -> {
             dialog.start(new Stage(), this);
             customScanButton.setDisable(true);
             quickScanButton.setDisable(true);
             fullScanButton.setDisable(true);
         });
+
         fullScanButton.setOnAction(event -> {
             Path[] paths = new Path[1];
             paths[0] = Paths.get("Computer");
@@ -224,17 +231,21 @@ public class ViradoGUI extends Application {
         tableVbox.setPadding(new Insets(10, 10, 10, 10));
         TableColumn<Malware, String> fileNameColumn = new TableColumn<>(FILE_NAME_COLUMN);
         fileNameColumn.setCellValueFactory(
-                new PropertyValueFactory<>("fileName"));
+            new PropertyValueFactory<>("fileName"));
         TableColumn<Malware, String> fileSizeColumn = new TableColumn<>(SIZE_COLUMN);
         fileSizeColumn.setCellValueFactory(
-                new PropertyValueFactory<>("size"));
+            new PropertyValueFactory<>("size"));
         TableColumn<Malware, Path> filePathColumn = new TableColumn<>(PATH_COLUMN);
         filePathColumn.setCellValueFactory(
-                new PropertyValueFactory<>("path"));
+            new PropertyValueFactory<>("path"));
+        TableColumn<Malware, Path> quarantineColumn = new TableColumn<>("Quarantine");
+        quarantineColumn.setCellValueFactory(
+            new PropertyValueFactory<>("quarantine"));
         // bind columns to table so that when you resize table columns resize too.
-        fileNameColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.3));
+        fileNameColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.25));
         filePathColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.4));
-        fileSizeColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.3));
+        fileSizeColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.15));
+        quarantineColumn.prefWidthProperty().bind(tableView.widthProperty().multiply(0.2));
 
         MenuItem deleteMenuItem = new MenuItem("Delete");
         deleteMenuItem.setOnAction(event -> {
@@ -248,28 +259,57 @@ public class ViradoGUI extends Application {
                 e.printStackTrace();
             }
         });
+        MenuItem quarantineMenuItem = new MenuItem("Quarantine/Remove from quarantine");
 
-        MenuItem quarantineMenuItem = new MenuItem("Quarantine");
-        quarantineMenuItem.setOnAction(event -> {
-            Malware selectedMalware = tableView.getSelectionModel().getSelectedItem();
-            if (selectedMalware != null) {
-                selectedMalware.getPath();
-
-            }
-        });
         ContextMenu contextMenu = new ContextMenu();
         contextMenu.setAutoFix(true);
         contextMenu.setHideOnEscape(true);
         contextMenu.setPrefSize(40, 40);
         contextMenu.getItems().addAll(deleteMenuItem, quarantineMenuItem);
-
+        quarantineAction(quarantineMenuItem, contextMenu);
         tableView.setContextMenu(contextMenu);
         tableView.setItems(malwareData);
         tableView.getColumns().add(fileNameColumn);
         tableView.getColumns().add(fileSizeColumn);
         tableView.getColumns().add(filePathColumn);
+        tableView.getColumns().add(quarantineColumn);
         tableVbox.getChildren().addAll(malwareLabel, tableView);
         tableVbox.setAlignment(Pos.BOTTOM_CENTER);
+    }
+
+    private void quarantineAction(MenuItem quarantineMenuItem, ContextMenu contextMenu) {
+        quarantineMenuItem.setOnAction(event ->
+            {
+                Malware selectedMalware = tableView.getSelectionModel().getSelectedItem();
+                try {
+                    if (selectedMalware != null) {
+                        boolean decrypted = false;
+                        for (Malware malware : encryptedMalware) {
+                            if (selectedMalware.equals(malware)) {
+                                decrypted = true;
+                                Quarantine.decryptAES(selectedMalware.getPath());
+                                selectedMalware.setQuarantine(false);
+                                tableView.refresh();
+                                encryptedMalware.remove(selectedMalware);
+                                contextMenu.hide();
+                            }
+                        }
+                        if (!decrypted) {
+                            Quarantine.encryptAES(selectedMalware.getPath());
+                            selectedMalware.setQuarantine(true);
+                            tableView.refresh();
+                            encryptedMalware.add(selectedMalware);
+                            contextMenu.hide();
+                        }
+                    }
+                }
+                catch (ConcurrentModificationException e)
+                {
+                    e.printStackTrace();
+                }
+
+            }
+        );
     }
 
     private void updateSucceededUI(Labeled infectedSoFarLabel, HBox progressHb, Label currentFileLabel, Label scanLabel, CoordinatingTask task) {
@@ -309,6 +349,7 @@ public class ViradoGUI extends Application {
         backButton.setOnAction(event -> {
             stopButton.fire();
             initialScanTabState();
+            malwareData.clear();
         });
 
         final HBox backHbox = new HBox(backButton);
