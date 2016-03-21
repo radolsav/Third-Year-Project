@@ -155,7 +155,6 @@ public class ViradoGUI extends Application {
             paths[0] = Paths.get("Computer");
             scanProcessTabUI(paths);
         });
-
     }
 
     protected void scanProcessTabUI(Path[] pathsToScan) {
@@ -207,7 +206,6 @@ public class ViradoGUI extends Application {
         stopButton.setOnAction(actionEvent -> {
             if (!task.isDone()) {
                 task.stop();
-                malwareData.clear();
 //                thread.interrupt();
                 scanLabel.setText("Stopped");
             }
@@ -283,7 +281,7 @@ public class ViradoGUI extends Application {
                 Malware selectedMalware = tableView.getSelectionModel().getSelectedItem();
                 try {
                     if (selectedMalware != null) {
-                        boolean decrypted = false;
+                        boolean decrypted = selectedMalware.getQuarantine();
                         for (Malware malware : encryptedMalware) {
                             if (selectedMalware.equals(malware)) {
                                 decrypted = true;
@@ -307,7 +305,6 @@ public class ViradoGUI extends Application {
                 {
                     e.printStackTrace();
                 }
-
             }
         );
     }

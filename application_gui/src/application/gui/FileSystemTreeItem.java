@@ -14,7 +14,6 @@ public class FileSystemTreeItem<T> extends TreeItem {
     private boolean isLeaf;
     private boolean isFirstTimeChildren = true;
     private boolean isFirstTimeLeaf = true;
-    private static final String PERMISSION_FLD  = "C:\\LoL\\cache";
 
     public FileSystemTreeItem(File file) {
         super(file);
@@ -41,7 +40,7 @@ public class FileSystemTreeItem<T> extends TreeItem {
 
     private ObservableList<FileSystemTreeItem> populateChildren(TreeItem<File> item) {
         File file = item.getValue();
-        if (file.isDirectory() && file.exists() && !file.toString().equals(PERMISSION_FLD))
+        if (file.isDirectory() && file.exists())
         {
             File[] files = file.listFiles();
             if (files != null) {
